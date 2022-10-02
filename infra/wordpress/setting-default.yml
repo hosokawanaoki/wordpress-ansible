@@ -1,0 +1,103 @@
+
+- hosts: all
+  become: true
+  remote_user: root
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - name: apt update
+      apt:
+        update_cache: yes
+
+    - name: apt upgrade
+      apt:
+        upgrade: yes
+  
+    - name: apt install
+      apt:
+        name:
+          - vim
+          - ansible
+          - python3-pip
+          - python3-mysqldb
+          - python3-dev
+          - libmysqlclient-dev
+          - openssl
+          - python-openssl
+          - python3-certbot-nginx
+          - aptitude
+          - php-gd
+          - gettext
+    
+    - name: Install LEMP Packages
+      apt: name={{ item }} update_cache=yes state=latest
+      loop: 
+        - 'nginx'
+        - 'mysql-server'
+        - 'python3-pymysql'
+        - 'php-fpm'
+        - 'php-mysql'
+        - 'php-mbstring'
+        - 'php7.4-curl'
+        - 'php7.4-zip'
+        - 'php7.4-mbstring'
+        - 'php7.4-dom'
+
+    - name: php ini setting
+      lineinfile:
+        dest: '/etc/php/7.4/fpm/php.ini'
+        state: present
+        regexp: '{{ item.regexp }}'
+        line: '{{ item.line }}'
+      with_items:
+        - regexp: '^;(date.timezone) =.*'
+          line: 'date.timezone = Asia/Tokyo'
+        - regexp: '^upload_max_filesize =.*'
+          line: 'upload_max_filesize = 200M'
+        - regexp: '^max_execution_time =.*'
+          line: 'max_execution_time = 200'
+        - regexp: '^post_max_size =.*'
+          line: 'post_max_size = 200M'
+
+    - name: restart php7.4-fpm
+      service: name=php7.4-fpm state=restarted
+
+    - name: "Installing pip dependencies"
+      pip:
+        name: 
+          - mysqlclient
+
+    - name: Removes "default" site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+
+    - name: send basic code
+      copy :
+        src: "files/.htpasswd"
+        dest: "/etc/nginx/.htpasswd"
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+    # Wordpress cli
+    - name: Get wp-cli
+      get_url:
+        url: "{{ PORTAL.CLI.PHAR_URL }}"
+        dest: "{{ TEMP_DIR }}/{{ PORTAL.CLI.PHAR_NAME }}"
+        mode: 0755
+  
+    - name: Move wp-cli
+      shell: "mv {{ TEMP_DIR }}/{{ PORTAL.CLI.PHAR_NAME }} /usr/local/bin/{{ PORTAL.CLI.COMMAND_NAME }}"
+    
+    - name: Create Symlink
+      file: 
+        src: /usr/local/bin/{{ PORTAL.CLI.COMMAND_NAME }}
+        dest: /usr/bin/{{ PORTAL.CLI.COMMAND_NAME }}
+        owner: root 
+        group: root
+        state: link

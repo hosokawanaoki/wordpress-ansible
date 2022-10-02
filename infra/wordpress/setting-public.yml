@@ -1,0 +1,24 @@
+
+- hosts: all
+  become: true
+  remote_user: root
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - name: Sets Nginx conf file
+      template :
+        src: "{{ PUBLIC.NGINX_CONF }}"
+        dest: "/etc/nginx/sites-available/{{ PUBLIC.DOMAIN }}.conf"
+
+    - name: Enables new site
+      file:
+        src: "/etc/nginx/sites-available/{{ PUBLIC.DOMAIN }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ PUBLIC.DOMAIN }}.conf"
+        state: link
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded

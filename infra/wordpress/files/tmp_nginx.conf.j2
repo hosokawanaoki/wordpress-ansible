@@ -1,0 +1,6 @@
+server {
+        listen 80;
+        server_name {{ BASE.DOMAIN }} {{ PORTAL.DOMAIN }} www.{{ PORTAL.DOMAIN }};
+        root /var/www/html/;
+        return 301 https://{{ PORTAL.DOMAIN }}$request_uri;
+}

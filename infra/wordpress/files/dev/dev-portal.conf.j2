@@ -1,0 +1,32 @@
+server {
+        listen 80;
+        server_name {{ PORTAL.DOMAIN }};
+        return 301 https://{{ PORTAL.DOMAIN }}$request_uri;
+}
+server {
+        listen 443;
+        ssl on;
+        root {{ BASE.PATH }}/src;
+        index index.php index.html index.htm index.nginx-debian.html;
+        server_name {{ PORTAL.DOMAIN }};
+
+        auth_basic "Restricted";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        client_max_body_size 20M;
+        location / {
+                try_files $uri $uri/ =404 /index.php?$args;
+        }
+
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+        }
+
+        location ~ /\.ht {
+                deny all;
+        }
+        ssl_certificate /etc/letsencrypt/live/party-.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/party-.com/privkey.pem;
+
+}

@@ -1,0 +1,4 @@
+**/secret/*
+**/backup/*
+*.sql
+!wordpress/secret/sample

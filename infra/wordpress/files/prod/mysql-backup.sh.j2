@@ -1,0 +1,39 @@
+#!/bin/sh
+ 
+# -------------------------------------------------------
+#
+# [環境設定]
+#
+ 
+# バックアップファイルを保存するディレクトリパス
+dirpath='{{PORTAL.BACKUP_DIR}}'
+ 
+# バックアップを保存する日数
+period=14
+# -------------------------------------------------------
+ 
+#
+# [バックアップ取得処理]
+#
+# ファイル名を定義  ※「mysql-dump-yymmdd.sql」となるようにします
+fileprefix="mysql-{{PORTAL.DB.NAME}}-dump-"
+filedate=`date +%y%m%d`
+filename=$fileprefix$filedate
+ 
+# mysqldumpを実行しdumpファイルを出力
+mysqldump -u {{PORTAL.DB.USER}} -p{{PORTAL.DB.PASS}} {{PORTAL.DB.NAME}} > $dirpath/$filename.sql
+ 
+# 出力されたdumpファイルのパーミション変更
+chmod 700 $dirpath/$filename.sql
+ 
+#
+# [ローテーション処理]
+#
+# 削除対象年月日を取得
+olddate=`date --date="$period days ago" +%y%m%d`
+ 
+# 削除対象ファイル名を生成
+oldfile=$fileprefix$olddate
+ 
+# 削除実行
+rm -f $dirpath/$oldfile.sql

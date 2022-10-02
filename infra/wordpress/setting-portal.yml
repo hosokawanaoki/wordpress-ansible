@@ -1,0 +1,117 @@
+
+- hosts: all
+  become: true
+  remote_user: root
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+
+    # MySQL Configuration
+    - name: mysqld start
+      shell: "service mysql start"
+
+    - name: Sets the root password
+      block:
+        - name: Sets the root password
+          mysql_user: 
+            name: "{{ PORTAL.DB.USER }}"
+            login_password: "{{ PORTAL.DB.PASS }}"
+            password: "{{ PORTAL.DB.PASS  }}"
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+      rescue: # DB作成初回のみ
+        - name: Sets the root password
+          mysql_user: 
+            name: "{{ PORTAL.DB.USER }}"
+            login_password: ""
+            password: "{{ PORTAL.DB.PASS  }}"
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Removes all anonymous user accounts
+      mysql_user:
+        name: ''
+        host_all: yes
+        state: absent
+        login_user: "{{ PORTAL.DB.USER }}"
+        login_password: "{{ PORTAL.DB.PASS }}"
+
+    - name: Removes the MySQL test database
+      mysql_db: 
+        name: test 
+        state: absent
+        login_user: "{{ PORTAL.DB.USER }}"
+        login_password: "{{ PORTAL.DB.PASS }}"
+
+    # create wordpress status
+    - name: create mysql database
+      mysql_db:
+        login_user: "{{ PORTAL.DB.USER }}"
+        login_password: "{{ PORTAL.DB.PASS }}"
+        name: "{{ PORTAL.DB.NAME }}"
+        state: present
+        encoding: utf8mb4
+    - name: make buckup dir
+      file: 
+        path: "{{ PORTAL.BACKUP_DIR }}"
+        state: directory
+        owner: root
+        group: root
+        mode: 0755
+    - name: auto backup shell up
+      template:
+        src: "{{ PORTAL.BACKUP_SHELL }}"
+        dest: "{{ BASE.PATH }}/infra/mysql-backup.sh"
+        owner: root
+        group: root
+        mode: u=rw,g=r,o=r
+    - name: auto backup set crontab
+      become: True
+      cron:
+        name: バックアップ
+        minute: 0
+        hour: 3
+        job: "sh {{ BASE.PATH }}/infra/mysql-backup.sh"
+        state: present
+
+    - name: git clone wordpress
+      git:
+        repo: https://{{ GIT.ID }}:{{ GIT.PASS }}@github.com/hosokawanaoki/wp-portal.git
+        dest: "{{ BASE.PATH }}"
+        update: no
+
+    - name: git config
+      git_config: name=user.name scope=global value="{{ GIT.ID }}"
+
+    - name: git config
+      git_config: name=user.email scope=global value="{{ GIT.EMAIL }}"
+    
+    - name: config file copy
+      template:
+        src: "{{ PORTAL.WP_CONF }}"
+        dest: "{{ BASE.PATH }}/src/wp-config.php"
+        owner: root
+        group: root
+        mode: u=rw,g=r,o=r
+
+    - name: permission change
+      file:
+        dest: "{{ BASE.PATH }}"
+        mode: 0777
+        recurse: yes
+
+    - name: Sets Nginx conf file
+      template :
+        src: "{{ PORTAL.NGINX_CONF }}"
+        dest: "/etc/nginx/sites-available/{{ PORTAL.DOMAIN }}.conf"
+
+    - name: Enables new site
+      file:
+        src: "/etc/nginx/sites-available/{{ PORTAL.DOMAIN }}.conf"
+        dest: "/etc/nginx/sites-enabled/{{ PORTAL.DOMAIN }}.conf"
+        state: link
+
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded

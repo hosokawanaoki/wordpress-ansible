@@ -1,0 +1,34 @@
+server {
+        listen 80;
+        server_name {{ PORTAL.DOMAIN }};
+        return 301 https://{{ PORTAL.DOMAIN }}$request_uri;
+}
+server {
+        listen 443;
+        ssl on;
+        root {{ BASE.PATH }}/src;
+        index index.php index.html index.htm index.nginx-debian.html;
+        server_name {{ PORTAL.DOMAIN }};
+
+        client_max_body_size 20M;
+        location / {
+                try_files $uri $uri/ =404 /index.php?$args;
+        }
+
+        location ~ \.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+        }
+
+        # buddy press doc
+        location /wp-content/uploads/bp-attachments/ {
+                rewrite ^.*uploads/bp-attachments/([0-9]+)/(.*) /?p=$1&bp-attachment=$2 permanent;
+        }
+
+        location ~ /\.ht {
+                deny all;
+        }
+        ssl_certificate /etc/letsencrypt/live/party-.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/party-.com/privkey.pem;
+
+}
